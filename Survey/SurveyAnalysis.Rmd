@@ -1,0 +1,545 @@
+---
+title: "Marketing"
+author: "Mariapia Tedesco"
+date: "2024-04-25"
+output:
+  pdf_document:
+    latex_engine: xelatex
+  html_document:
+    df_print: paged
+---
+
+# Part 1: Data cleaning and pre-processing
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggthemes)
+library(vcd)
+library(ggplot2)
+library(tableone)
+```
+
+
+```{r}
+dat <- read.csv("/Users/mariapiatedesco/Library/CloudStorage/OneDrive-UniversitàCommercialeLuigiBocconi/Marketing/Marketing_April 29, 2024_16.47.csv")
+
+head(dat)
+```
+
+
+```{r}
+dat <- dat %>%
+  filter(Finished == 'True') %>%
+  select(-c(1:17, 43)) %>%
+  slice(-1, -2)
+
+head(dat)
+```
+
+
+```{r}
+dat$Sex <- as.factor(dat$Sex)
+dat$Age <- as.factor(dat$Age)
+dat$Education <- as.factor(dat$Education)
+dat$Occupation <- as.factor(dat$Occupation)
+dat$Familial.cases. <- as.factor(dat$Familial.cases.)
+dat$Psychoterapy <- as.factor(dat$Psychoterapy)
+dat$Time <- as.factor(dat$Time)
+dat$Social <- as.factor(dat$Social)
+dat$Communities <- as.factor(dat$Communities)
+dat$Impact.1 <- as.factor(dat$Impact.1)
+dat$Q1._1 <- as.factor(dat$Q1._1)
+dat$Q1._2 <- as.factor(dat$Q1._2)
+dat$Q1._3 <- as.factor(dat$Q1._3)
+dat$Q1._4 <- as.factor(dat$Q1._4)
+dat$Q1._5 <- as.factor(dat$Q1._5)
+dat$Vignetta_1 <- as.numeric(dat$Vignetta_1)
+dat$Treatment_1 <- as.numeric(dat$Treatment_1)
+dat$Control_1 <- as.numeric(dat$Control_1)
+dat$Treated <- as.factor(dat$Treated)
+
+head(dat)
+```
+
+```{r}
+dat <- dat %>% 
+  rename(Psychotherapy = Psychoterapy) %>%
+  rename(FamilyCases = Familial.cases.) %>%
+  rename(EmotionalConnection = Emotional.connection_1) %>%
+  rename(Impact = Impact.1)
+```
+
+
+```{r}
+dat <- dat %>%
+  mutate(Purpose = strsplit(as.character(Purpose), ",")) %>%
+  unnest(Purpose) %>%
+  mutate(Purpose = trimws(Purpose)) %>%
+  mutate(value = 1) %>%
+  pivot_wider(
+    names_from = Purpose, 
+    names_prefix = "Purpose_",
+    values_from = value, 
+    values_fill = list(value = 0)
+  )
+
+dat <- dat %>%
+  mutate(Activity = strsplit(as.character(Activity), ",")) %>%
+  unnest(Activity) %>%
+  mutate(Activity = trimws(Activity)) %>%
+  mutate(value = 1) %>%
+  pivot_wider(
+    names_from = Activity, 
+    names_prefix = "Activity_",
+    values_from = value, 
+    values_fill = list(value = 0)
+  )
+
+dat <- dat %>%
+  mutate(across(.cols = tail(names(.), 15), .fns = as.factor))
+
+head(dat)
+```
+
+
+```{r}
+dat$Psychotherapy <- fct_recode(dat$Psychotherapy, "YesNow" = "Yes, I am currently undergoing psychotherapy treatment", 'YesPast'='Yes, I have received psychotherapy treatment in the past', "No" = "No, I have never received psychotherapy treatment", "PreferNotAnswer" = "Prefer not to answer")
+
+dat$FamilyCases <- fct_recode(dat$FamilyCases, "NotSure" = "I'm not sure", "No" = "No", 'Yes' = 'Yes', "PreferNotAnswer" = "Prefer not to answer")
+
+datSex <- fct_recode(dat$Sex, "M" = "Male", "F" = "Female", "PreferNotAnswer" = "Prefer not to answer")
+
+head(dat)
+```
+
+
+```{r}
+map_values <- function(x) {
+  case_when(
+    x == "All of the time" ~ 5,
+    x == "Most of the time" ~ 4,
+    x == "More than half the time" ~ 3,
+    x == "Less than half the time" ~ 2,
+    x == "Some of the time" ~ 1,
+    x == "At no time" ~ 0
+  )
+}
+
+temp <- dat[15:19]
+temp <- lapply(temp, map_values)
+dat$WHOscore <- rowSums(as.data.frame(temp), na.rm = TRUE)
+
+head(dat)
+```
+
+
+```{r}
+dat$Before <- dat$Vignetta_1 
+dat$After <- ifelse(is.na(dat$Treatment_1), dat$Control_1, dat$Treatment_1)
+dat$Diff <- dat$After-dat$Before
+
+head(dat)
+```
+
+
+```{r}
+dat <- dat %>%
+  select(-c('Social_7_TEXT', 'Purpose_9_TEXT', 'Activity_6_TEXT', 'Vignetta_1', 'Treatment_1', 'Control_1', 'Purpose_Other', 'Activity_Other', 'Q1._1', 'Q1._2', 'Q1._3', 'Q1._4', 'Q1._5'))
+
+head(dat)
+```
+
+
+```{r}
+summary(dat)
+```
+
+
+```{r}
+dat %>%
+  filter(Before == 10 | Diff < -5)
+```
+
+
+```{r}
+dat <- dat %>%
+  filter(!(Before == 10 | Diff < -5))
+head(dat)
+```
+
+```{r}
+write.csv(dat, 'dat_marketing.csv')
+```
+
+
+
+# Part 2: Exploratory data analysis 
+
+
+### Sample analysis
+
+**Sex, Age and Education**
+
+```{r}
+prop.table(table(dat$Sex))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(Sex) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Sex, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Sex") +
+  theme_minimal()
+```
+
+
+```{r}
+prop.table(table(dat$Age))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(Age) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Age, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Age") +
+  theme_minimal()
+```
+
+```{r}
+prop.table(table(dat$Occupation))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(Occupation) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Occupation, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Occupation") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+  
+```
+
+
+
+**Family and Therapy**
+
+```{r}
+prop.table(table(dat$FamilyCases))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(FamilyCases) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = FamilyCases, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Family Cases") +
+  theme_minimal()  
+```
+
+```{r}
+prop.table(table(dat$Psychotherapy))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(Psychotherapy) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Psychotherapy, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Psychotherapy") +
+  theme_minimal()  
+```
+
+
+```{r}
+tbl <- structable(Psychotherapy ~ FamilyCases, data = dat)
+mosaic(tbl, shade = TRUE, legend = TRUE, 
+       labeling_args = list(rot_labels = c(top = 45, left = 45)))
+```
+
+
+**Social Media Use**
+
+```{r}
+prop.table(table(dat$Time))*100
+```
+
+```{r}
+dat$Time <- factor(dat$Time, levels = c("Less than 1 hour", "1-2 hours", "3-4 hours", "More than 4 hours"))
+
+freq <- dat %>%
+  count(Time) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Time, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Time spent on social media / day") +
+  theme_minimal()  
+```
+
+```{r}
+prop.table(table(dat$Social))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(Social) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Social, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Main social media used") +
+  theme_minimal()  
+```
+
+```{r}
+tbl <- structable(Social~Time, data=dat)
+mosaic(tbl, shade=TRUE, legend=TRUE, 
+       labeling_args = list(rot_labels = c(top = 45, left = 45)))
+```
+
+```{r}
+prop.table(table(dat$Communities))*100
+```
+
+```{r}
+dat$Communities <- factor(dat$Communities, levels = c("Never", "Rarely", "Sometimes", "Often", "Always"))
+
+freq <- dat %>%
+  count(Communities) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Communities, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Engagement with content mental-health related") +
+  theme_minimal() 
+```
+
+```{r}
+prop.table(table(dat$EmotionalConnection))*100
+```
+
+```{r}
+freq <- dat %>%
+  count(EmotionalConnection) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = EmotionalConnection, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Emotional connection to the content") +
+  theme_minimal() 
+```
+
+
+```{r}
+prop.table(table(dat$Impact))*100
+```
+
+```{r}
+dat$Impact <- factor(dat$Impact, levels = c("Extremely negative", "Somewhat negative", "Neither positive nor negative", "Somewhat positive", "Extremely positive"))
+
+freq <- dat %>%
+  count(Impact) %>%
+  mutate(perc = n / sum(n) * 100)  
+
+ggplot(freq, aes(x = Impact, y = n)) +
+  geom_bar(stat = "identity", fill = 'skyblue') +
+  geom_text(aes(label = paste0(round(perc, 1), "%"), y = n + 5), vjust = 0) +
+  labs(y = 'Frequency', x = "Impact of the content on the mental wellbeing") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+
+**WHO**
+
+```{r}
+summary(dat$WHOscore)
+```
+
+```{r}
+ggplot(dat, aes(x = WHOscore)) +
+  geom_histogram(aes(y = ..density..), fill = "skyblue", color = "black", bins = 10, alpha = 0.5) +
+  geom_density(alpha = 0.5, color = "red") +
+  labs(x = "WHO Score", y = "Density") +
+  theme_minimal()
+```
+
+
+```{r}
+meanWho <- dat %>%
+  group_by(Psychotherapy) %>%
+  summarize(MeanWHO = mean(WHOscore))
+meanWho
+```
+
+```{r}
+ggplot(dat, aes(x=Psychotherapy, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  theme_minimal()
+```
+
+
+```{r}
+meanWho <- dat %>%
+  group_by(FamilyCases) %>%
+  summarize(MeanWHO = mean(WHOscore))
+meanWho
+```
+
+```{r}
+ggplot(dat, aes(x=FamilyCases, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  theme_minimal()
+```
+
+```{r}
+meanWho <- dat %>%
+  group_by(Sex) %>%
+  summarize(MeanWHO = mean(WHOscore))
+meanWho
+```
+
+```{r}
+ggplot(dat, aes(x=Sex, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  theme_minimal()
+```
+
+```{r}
+meanWho <- dat %>%
+  group_by(Time) %>%
+  summarize(MeanWHO = mean(WHOscore))
+meanWho
+```
+
+```{r}
+ggplot(dat, aes(x=Time, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  labs(x = "Time spent on social media / day") +
+  theme_minimal()
+```
+
+
+```{r}
+meanWho <- dat %>%
+  group_by(EmotionalConnection) %>%
+  summarize(MeanWHO = mean(WHOscore))
+meanWho
+```
+
+```{r}
+ggplot(dat, aes(x=EmotionalConnection, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  labs(x = "Emotional connection to the content") +
+  theme_minimal()
+```
+
+```{r}
+meanWho <- dat %>%
+  group_by(Impact) %>%
+  summarize(MeanWHO = mean(WHOscore))
+meanWho
+```
+
+```{r}
+ggplot(dat, aes(x=Impact, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  labs(x ="Impact of the content on the mental wellbeing")+
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+```
+
+
+
+```{r}
+ggplot(dat, aes(x=`Activity_Offering advice`, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(dat, aes(x=Communities, y = WHOscore)) +
+  geom_boxplot(outlier.colour = "red", outlier.shape = 1, fill = "skyblue", colour = "black") +
+  theme_minimal()
+```
+
+
+# Part 3: Experiment
+
+```{r}
+vars <- setdiff(names(dat), "Treated") 
+table1 <- CreateTableOne(vars = vars, strata = "Treated", data = dat, test = TRUE)
+table1
+```
+
+```{r}
+ggplot(dat, aes(x = Treated, y = Diff, fill = Treated)) +
+  geom_boxplot() +
+  labs(title = "Change in Outcome by Treatment Status", y = "Change from Before to After", x = "Treatment Status") +
+  theme_minimal()
+```
+
+
+```{r}
+t.test(Diff ~ Treated, data = dat)
+```
+
+```{r}
+t_test_result <- t.test(dat$After, dat$Before, paired=TRUE)
+t_test_result
+```
+
+```{r}
+long_data <- gather(dat, key = "Condition", value = "Score", Before, After)
+
+ggplot(long_data, aes(x = Condition, y = Score)) +
+  geom_boxplot(fill = "skyblue") +
+  theme_minimal() +
+  labs(title = "Emotional Well-being Before and After Reading Comments",
+       y = "Emotional Well-being", 
+       x = 'Timepoint')
+
+```
+
+
+```{r}
+long_data <- dat %>%
+  gather(key = "Timepoint", value = "WellBeingScore", Before, After)
+
+ggplot(long_data, aes(x = Timepoint, y = WellBeingScore, fill = Treated)) +
+  geom_boxplot() +
+  facet_wrap(~ Treated) +
+  labs(title = "Emotional Well-Being Before and After Treatment",
+       x = "Timepoint",
+       y = "Emotional Well-Being") +
+  theme_minimal()
+```
+
+
+
+
+

@@ -1,0 +1,167 @@
+---
+title: "Graphs_Sentiment"
+author: "Arianna Zottoli"
+date: "2024-04-29"
+output: html_document
+---
+
+# Comparisons of all posts, comments and replies
+
+
+# Emotion Analysis
+
+
+```{r}
+data<- read_csv(file="dataset_r_emotion.csv")
+
+```
+
+```{r}
+str(data)
+```
+
+
+
+## Emotion
+```{r}
+emotion<- rep(c("Anger", "Joy", "Optimism", "Sadness"), 3)
+```
+
+## Type of data
+
+```{r}
+posts<- rep(c("Post"), 4)
+comments<- rep(c("Comment"), 4)
+reply<- rep(c("Reply"),4)
+type<- c(posts, comments, reply)
+type
+```
+
+
+## Frequency of posts
+```{r}
+posts<- data.frame(data$post, data$max_p)
+unique_posts<- unique(posts)
+
+tab1<- data.frame(table(unique_posts$data.max_p)/nrow(unique_posts))
+tab1
+```
+
+## Frequency of comments 
+```{r}
+tab2<- data.frame(table(data$max_c)/nrow(data))
+tab2
+```
+
+
+## Frequency of answers 
+```{r}
+tab3<- data.frame(table(data$max_a)/nrow(data))
+tab3
+```
+
+## Frequency
+
+```{r}
+frequency<- c(tab1$Freq, tab2$Freq, tab3$Freq)
+frequency
+```
+
+```{r}
+values<- data.frame(emotion, type, frequency)
+
+```
+
+
+```{r}
+values$type <- factor(values$type, levels = c("Post", "Comment", "Reply"))
+```
+
+
+## Graph 
+```{r}
+library(ggplot2)
+ggplot(values, aes(x=emotion, y=frequency, fill=type)) + 
+  geom_bar(stat="identity", position= position_dodge()) + scale_fill_discrete(limits=c("Post", "Comment", "Reply")) + 
+  xlab("Emotion Category") + ylab("Relative Frequency of Posts") + 
+  labs(fill = "Element") + theme_classic()
+```
+
+
+
+
+# Sentiment Analysis
+
+```{r}
+data<- read_csv(file="dataset_r_sentiment.csv")
+```
+
+```{r}
+str(data)
+```
+
+
+
+## Emotion
+```{r}
+sentiment<- rep(c("Negative", "Neutral", "Positive"), 3)
+sentiment
+```
+
+## Type of data
+
+```{r}
+posts<- rep(c("Post"), 3)
+comments<- rep(c("Comment"), 3)
+reply<- rep(c("Reply"),3)
+type<- c(posts, comments, reply)
+type
+```
+
+## Frequency of posts 
+
+```{r}
+posts<- data.frame(data$post, data$max_p)
+unique_posts<- unique(posts)
+
+tab1<- data.frame(table(unique_posts$data.max_p)/nrow(unique_posts))
+tab1
+```
+
+## Frequency of comments 
+
+```{r}
+tab2<- data.frame(table(data$max_c)/nrow(data))
+tab2
+```
+
+## Frequency of answers 
+
+```{r}
+tab3<- data.frame(table(data$max_a)/nrow(data))
+tab3
+```
+
+## Frequency 
+
+```{r}
+frequency<- c(tab1$Freq, tab2$Freq, tab3$Freq)
+frequency
+```
+
+```{r}
+values<- data.frame(sentiment, type, frequency)
+values$type <- factor(values$type, levels = c("Post", "Comment", "Reply"))
+values
+
+```
+
+## Graph 
+```{r}
+library(ggplot2)
+ggplot(values, aes(x=sentiment, y=frequency, fill=type)) + 
+  geom_bar(stat="identity", position= position_dodge()) + scale_fill_discrete(limits=c("Post", "Comment", "Reply")) + 
+  xlab("Sentiment Category") + ylab("Relative Frequency of Posts") + 
+  labs(fill = "Element") + theme_classic()
+```
+
